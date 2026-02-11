@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 除夕撞鐘人流回報</title>
+    <style>
+        :root {
+            --primary-blue: #007bff;
+            --primary-orange: #ff9800;
+            --bg-dark: #121212;
+            --text-light: #ffffff;
+            --text-dim: #cccccc; /*稍微調亮一點，讓小字更清楚*/
+            --success-green: #28a745;
+            --error-red: #dc3545;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            margin: 0;
+            padding: 0;
+            overscroll-behavior: none;
+        }
+
+        /* === 1. 頂部看板區 (統一高度與字體) === */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px; /* 稍微縮小內距 */
+            background-color: #1e1e1e;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .stat-box {
+            width: 48%;
+            padding: 12px 5px;
+            border-radius: 8px;
+            text-align: center;
+            display: flex;       /* 使用 Flexbox 讓內容置中對齊 */
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .stat-box.blue { background-color: #004085; border: 1px solid var(--primary-blue); }
+        .stat-box.orange { background-color: #854d00; border: 1px solid var(--primary-orange); }
+
+        /* 看板標籤 (Level 4: 16px) */
+        .stat-label { font-size: 16px; color: var(--text-dim); margin-bottom: 5px; font-weight: normal; }
+        /* 看板數字 (Level 2+: 36px) - 稍微加大 */
+        .stat-value { font-size: 36px; font-weight: bold; line-height: 1.1; }
+        /* 單位 (Level 4: 16px) */
+        .stat-unit { font-size: 16px; font-weight: normal; margin-left: 2px; }
+
+
+        /* === 2. Tab 切換區 (統一文字大小) === */
+        .tab-container {
+            display: flex;
+            margin-top: 15px;
+            padding: 0 10px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 5px;
+            text-align: center;
+            background: #333;
+            color: #888;
+            border: none;
+            /* Tab 文字 (Level 4: 16px) - 確保長標題能換行但字不縮太小 */
+            font-size: 16px; 
+            font-weight: bold; 
+            line-height: 1.3;
+            border-radius: 10px 10px 0 0;
+            margin: 0 2px;
+            position: relative;
+            /* 讓長文字可以自然換行 */
+            white-space: normal; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 50px; /* 確保兩個 Tab 高度一致 */
+        }
+
+        .tab-btn.active {
+            background: #444;
+            color: #fff;
+        }
+
+        .tab-btn.locked::after {
+            content: "🔒";
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 10px;
+        }
+
+
+        /* === 3. 操作面板區 === */
+        .control-panel {
+            padding: 20px;
+            background: #444;
+            min-height: calc(100vh - 200px); /* 讓它佔滿剩餘高度 */
+            display: none; 
+        }
+
+        .control-panel.active { display: block; }
+
+        /* 標題文字 (Level 3: 20px) */
+        .control-panel h3 {
+            font-size: 20px;
+            font-weight: normal;
+            color: #ccc;
+            margin: 10px 0 20px 0;
+            text-align: center;
+        }
+
+        /* 顯示數字/輸入框 (Level 1: 80px) - 維持巨大 */
+        .number-display, .number-input {
+            font-size: 80px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0 30px 0; /* 增加下方距離 */
+            display: block;
+            width: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; /* 強制數字字體 */
+        }
+        
+        .number-display { color: var(--primary-blue); }
+        .control-panel.orange .number-display { color: var(--primary-orange); }
+
+        /* 輸入框特化樣式 */
+        .number-input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #666;
+            color: inherit;
+            outline: none;
+            padding: 5px 0;
+            -moz-appearance: textfield;
+        }
+        .number-input:focus { border-bottom: 2px solid #fff; }
+        .number-input::-webkit-outer-spin-button,
+        .number-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* === 修改：統一按鈕樣式 === */
+        .btn-group {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px; /* 按鈕左右間距 */
+            margin-bottom: 15px; /* 按鈕上下排間距 */
+        }
+
+        .btn-action {
+            flex: 1;                /* 自動填滿寬度 */
+            height: 80px;           /* 設定固定高度，確保一樣高 */
+            font-size: 32px;        /* 統一字體大小 */
+            font-weight: bold;
+            border: 2px solid #555; /* 統一邊框 */
+            border-radius: 12px;
+            background-color: #333; /* 統一背景色 (深灰色) */
+            color: white;
+            
+            /* 觸控優化 */
+            touch-action: manipulation; 
+            box-shadow: 0 4px 0 rgba(0,0,0,0.3); /* 立體感 */
+            display: flex;
+            align-items: center;    /* 文字垂直置中 */
+            justify-content: center; /* 文字水平置中 */
+        }
+
+        .btn-action:active { 
+            transform: translateY(4px); /* 按下去的效果 */
+            box-shadow: none; 
+        }
+
+        /* 送出按鈕 (Level 3: 22px) - 稍微小於數字按鈕，但要清楚 */
+        .btn-submit {
+            width: 100%;
+            padding: 18px;
+            font-size: 22px; 
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            background: var(--success-green);
+            color: white;
+            margin-top: 30px; /* 與上方區隔開 */
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        .btn-submit:active {
+            transform: translateY(4px); 
+            box-shadow: none; 
+        }
+        .btn-submit.disabled {
+            background: #555;
+            color: #aaa;
+            pointer-events: none;
+            box-shadow: none;
+        }
+
+
+        /* === 5. 登入遮罩 (Modal) === */
+        #login-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: #2c2c2c;
+            padding: 30px;
+            border-radius: 15px;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #444;
+            background: #121212;
+            color: #fff;
+            font-size: 20px; /* 登入字大一點 */
+            border-radius: 8px;
+            box-sizing: border-box; 
+            text-align: center;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        /* 提示訊息 (Toast) */
+        #toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            display: none;
+            z-index: 200;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-header">
+        <div class="stat-box blue">
+            <div class="stat-label">大殿內共有</div>
+            <div class="stat-value" id="dash-hall">-- <span class="stat-unit">人</span></div>
+        </div>
+        <div class="stat-box orange">
+            <div class="stat-label">累計移動往下</div>
+            <div class="stat-value" id="dash-platform">-- <span class="stat-unit">人</span></div>
+        </div>
+    </div>
+
+    <div id="login-modal">
+        <div class="login-card">
+            <h2 style="color: #fff; margin-bottom: 20px;">除夕撞鐘志工登入</h2>
+            <input type="email" id="input-email" class="login-input" placeholder="請輸入 Email">
+            <input type="tel" id="input-passcode" class="login-input" placeholder="4位數通行碼" maxlength="4">
+            <button class="btn-login" onclick="performLogin()">驗 證 身 分</button>
+            <p id="login-msg" style="color: var(--error-red); margin-top: 10px;"></p>
+        </div>
+    </div>
+
+    <div class="tab-container">
+        <button class="tab-btn locked" id="tab-hall" onclick="switchTab('hall')">大殿人數</button>
+        <button class="tab-btn locked" id="tab-platform" onclick="switchTab('platform')">大殿移動前往下平台總人數</button>
+    </div>
+
+<div id="panel-hall" class="control-panel">
+        <div class="number-display" id="val-hall">0</div>
+        
+        <div class="btn-group">
+            <button class="btn-action" onclick="instantUpdate('hall', -1)">-1</button>
+            <button class="btn-action" onclick="instantUpdate('hall', 1)">+1</button>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-action" onclick="instantUpdate('hall', 5)">+5</button>
+            <button class="btn-action" onclick="instantUpdate('hall', 10)">+10</button>
+        </div>
+    </div>
+
+    <div id="panel-platform" class="control-panel orange">
+        <h3 style="text-align: center; color: #ccc;">新增：這梯次帶走多少人？</h3>
+        
+        <input type="number" id="val-platform" class="number-input" value="0" inputmode="numeric" onchange="syncInput('platform')">
+        
+        <button class="btn-submit" style="background: var(--primary-orange);" onclick="submitData('platform')">更新大殿移動前往下平台總人數</button>
+    </div>
+
+    <div id="toast">資料已更新</div>
+
+    <script>
+        // === 全域變數 ===
+        const API_URL = "https://script.google.com/macros/s/AKfycby3ebD0_VLSoy_IfML61aVbQLAYqdaAorP0S-4kz_yHK-mUih5qSqvuK7pz_f3FlrW_/exec"; 
+        
+        let currentUser = null;
+        let userPermissions = []; 
+        let currentValues = { hall: 0, platform: 0 }; 
+
+        // === 1. 登入邏輯 ===
+        function performLogin() {
+            const email = document.getElementById('input-email').value.trim();
+            const passcode = document.getElementById('input-passcode').value.trim();
+            const btn = document.querySelector('.btn-login');
+            const msg = document.getElementById('login-msg');
+
+            if (!email || !passcode) {
+                msg.textContent = "請完整輸入";
+                return;
+            }
+
+            btn.textContent = "驗證中...";
+            btn.disabled = true;
+
+            fetch(`${API_URL}?action=login&email=${email}&passcode=${passcode}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "success") {
+                    currentUser = email;
+                    // 自動去除空格
+                    userPermissions = data.access.map(p => p.trim());
+                    
+                    document.getElementById('login-modal').style.display = 'none';
+                    unlockTabs();
+                    startPolling(); 
+                } else {
+                    msg.textContent = "驗證失敗：帳號或密碼錯誤";
+                    btn.textContent = "驗 證 身 分";
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                msg.textContent = "連線錯誤，請稍後再試";
+                btn.textContent = "驗 證 身 分";
+                btn.disabled = false;
+            });
+        }
+
+        // === 2. 權限解鎖邏輯 ===
+        function unlockTabs() {
+            console.log("當前使用者權限:", userPermissions);
+
+            const checkAccess = (keyword) => {
+                return userPermissions.some(p => p.includes(keyword));
+            };
+
+            // 解鎖 [大殿] Tab
+            if (checkAccess("大殿")) {
+                const tab = document.getElementById('tab-hall');
+                if(tab) {
+                    tab.classList.remove('locked');
+                    switchTab('hall');
+                }
+            }
+
+            // 解鎖 [下平台] Tab
+            if (checkAccess("下平台")) {
+                const tab = document.getElementById('tab-platform');
+                if(tab) {
+                    tab.classList.remove('locked');
+                    if (!checkAccess("大殿")) {
+                        switchTab('platform');
+                    }
+                }
+            }
+        }
+
+        function switchTab(target) {
+            const map = { 'hall': '大殿', 'platform': '下平台' };
+            const requiredPerm = map[target];
+
+            const checkAccess = (keyword) => {
+                return userPermissions.some(p => p.includes(keyword));
+            };
+
+            if (!checkAccess(requiredPerm)) {
+                showToast(`🚫 您沒有${requiredPerm}的回報權限`);
+                return;
+            }
+
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.control-panel').forEach(p => p.classList.remove('active'));
+
+            document.getElementById(`tab-${target}`).classList.add('active');
+            document.getElementById(`panel-${target}`).classList.add('active');
+        }
+
+        // === 3. 數值調整邏輯 (大殿即時更新專用) ===
+        function instantUpdate(type, delta) {
+            // 1. 從變數或畫面取得當前數值
+            let currentVal = currentValues[type] || 0;
+            
+            // 2. 計算新數值
+            let newVal = currentVal + delta;
+            if (newVal < 0) newVal = 0;
+
+            // 3. 更新畫面與全域變數
+            currentValues[type] = newVal;
+            document.getElementById(`val-${type}`).textContent = newVal;
+
+            // 4. 直接發送資料 (True 代表即時模式)
+            submitData(type, true); 
+        }
+
+        // === 4. 手動輸入同步邏輯 (下平台專用) ===
+        function syncInput(type) {
+            const input = document.getElementById(`val-${type}`);
+            let val = parseInt(input.value);
+            
+            if (isNaN(val) || val < 0) val = 0;
+            
+            currentValues[type] = val;
+            input.value = val; 
+        }
+
+        // === 5. 送出資料邏輯 (支援即時與確認兩種模式) ===
+        function submitData(type, isInstant = false) {
+            const val = currentValues[type];
+            const targetName = (type === 'hall') ? '大殿' : '下平台';
+            
+            // 非即時模式 (下平台) 才需要確認
+            if (!isInstant) {
+                if (!confirm(`確定送出「${targetName}」數據：${val} 人嗎？`)) return;
+            }
+
+            // UI 狀態處理
+            if (isInstant) {
+                showToast(`傳送中...`);
+            } else {
+                const btn = document.querySelector(`#panel-${type} .btn-submit`);
+                if(btn) {
+                    btn.textContent = "傳送中...";
+                    btn.classList.add('disabled');
+                }
+            }
+
+            fetch(`${API_URL}?action=updateData&target=${targetName}&value=${val}&user=${currentUser}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "success") {
+                    showToast(`✅ ${targetName} 更新成功！`);
+                    
+                    // 下平台送出後歸零
+                    if (type === 'platform') {
+                        currentValues['platform'] = 0;
+                        const el = document.getElementById('val-platform');
+                        if (el) el.value = 0;
+                    }
+                    
+                    // 立即更新看板
+                    fetchDashboardData();
+                } else {
+                    showToast("❌ 更新失敗：" + data.message);
+                }
+            })
+            .catch(err => showToast("❌ 網路連線錯誤"))
+            .finally(() => {
+                // 還原按鈕 (僅非即時模式)
+                if (!isInstant) {
+                    const btn = document.querySelector(`#panel-${type} .btn-submit`);
+                    if(btn) {
+                        const originalText = '更新大殿移動前往下平台總人數';
+                        btn.textContent = originalText;
+                        btn.classList.remove('disabled');
+                    }
+                }
+            });
+        }
+
+        // === 6. 看板自動更新 ===
+        function startPolling() {
+            fetchDashboardData(); 
+            setInterval(fetchDashboardData, 5000); 
+        }
+
+        function fetchDashboardData() {
+            fetch(`${API_URL}?action=getDashboard&t=${new Date().getTime()}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "success") {
+                    // 更新頂部看板
+                    document.getElementById('dash-hall').innerHTML = `${data.hall_final} <span class="stat-unit">人</span>`;
+                    document.getElementById('dash-platform').innerHTML = `${data.platform_total} <span class="stat-unit">人</span>`;
+                    
+                    // === 關鍵同步：讓大殿操作區的數字跟著看板走 ===
+                    // 這樣志工每次按 +1 都是基於最新的即時人數
+                    if (data.hall_final !== undefined) {
+                        currentValues['hall'] = parseInt(data.hall_final);
+                        const hallDisplay = document.getElementById('val-hall');
+                        if (hallDisplay) hallDisplay.textContent = currentValues['hall'];
+                    }
+                }
+            });
+        }
+
+        // === 工具 ===
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.display = 'block';
+            setTimeout(() => { t.style.display = 'none'; }, 2000); // 2秒後消失，避免擋住太久
+        }
+    </script>
+</body>
+</html>
